@@ -1,0 +1,547 @@
+diff --git a/.gitignore b/.gitignore
+index 3f2d108..0e945e0 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,3 +1,3 @@
+ bin/
+ obj/
+-idea/
+\ No newline at end of file
++.idea/
+diff --git a/src/Gait/App.cs b/src/Gait/App.cs
+new file mode 100644
+index 0000000..4c7a2c7
+--- /dev/null
++++ b/src/Gait/App.cs
+@@ -0,0 +1,37 @@
++﻿using Gait.Services;
++using Microsoft.Extensions.Logging;
++
++namespace Gait;
++
++public class App(ILogger<App> logger, GitDiffService gitDiffService)
++{
++    public async Task RunAsync()
++    {
++        logger.LogInformation("Starting Gait application...");
++
++        try
++        {
++            gitDiffService.Init();
++            var diff = gitDiffService.GetDiff();
++            if (string.IsNullOrWhiteSpace(diff))
++            {
++                logger.LogWarning("No git diff available - either no .sln file found, not in a git repository, or no changes detected");
++                return;
++            }
++
++            logger.LogInformation("Git diff retrieved successfully");
++            logger.LogDebug("Git diff output: {GitDiff}", diff);
++
++            logger.LogInformation("Requesting AI summary for git diff");
++            var summary = await gitDiffService.GetDiffSummaryAsync();
++            logger.LogInformation("AI summary generated successfully");
++            logger.LogInformation("Git Diff Summary: {Summary}", summary);
++        }
++        catch (Exception ex)
++        {
++            logger.LogError(ex, "An error occurred while processing git diff: {ErrorMessage}", ex.Message);
++        }
++
++        logger.LogInformation("Gait application completed.");
++    }
++}
+diff --git a/src/Gait/Configuration/OpenAIConfiguration.cs b/src/Gait/Configuration/OpenAIConfiguration.cs
+new file mode 100644
+index 0000000..be4feb4
+--- /dev/null
++++ b/src/Gait/Configuration/OpenAIConfiguration.cs
+@@ -0,0 +1,10 @@
++namespace Gait.Configuration;
++
++public class OpenAIConfiguration
++{
++    public const string SectionName = "OpenAI";
++    
++    public string Model { get; set; } = "gpt-4o-mini";
++    public string ApiKey { get; set; } = string.Empty;
++    public string PromptPath { get; set; } = string.Empty;
++}
+diff --git a/src/Gait/Gait.csproj b/src/Gait/Gait.csproj
+index ed9781c..607dfde 100644
+--- a/src/Gait/Gait.csproj
++++ b/src/Gait/Gait.csproj
+@@ -7,4 +7,28 @@
+     <Nullable>enable</Nullable>
+   </PropertyGroup>
+ 
++  <ItemGroup>
++    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
++    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
++    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="8.0.0" />
++    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
++    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
++    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
++    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
++    <PackageReference Include="Microsoft.Extensions.Logging.Configuration" Version="8.0.0" />
++    <PackageReference Include="Microsoft.SemanticKernel" Version="1.0.1" />
++    <PackageReference Include="Microsoft.SemanticKernel.Connectors.OpenAI" Version="1.0.1" />
++  </ItemGroup>
++
++  <ItemGroup>
++    <None Remove="appsettings.json" />
++    <Content Include="appsettings.json">
++      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
++    </Content>
++    <None Remove="diff-prompt.txt" />
++    <Content Include="diff-prompt.txt">
++      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
++    </Content>
++  </ItemGroup>
++
+ </Project>
+diff --git a/src/Gait/GitDiffRunner.cs b/src/Gait/GitDiffRunner.cs
+deleted file mode 100644
+index fef0cc8..0000000
+--- a/src/Gait/GitDiffRunner.cs
++++ /dev/null
+@@ -1,114 +0,0 @@
+-using System.Diagnostics;
+-
+-namespace Gait;
+-
+-public class GitDiffRunner
+-{
+-    private readonly string? _projectRoot;
+-    private readonly int _maxDirectoryTraversalDepth;
+-
+-    public GitDiffRunner(int maxDirectoryTraversalDepth = 10)
+-    {
+-        _maxDirectoryTraversalDepth = maxDirectoryTraversalDepth;
+-        // Get the project root directory (where .sln file is located)
+-        _projectRoot = GetProjectRoot();
+-    }
+-
+-    public async Task<string> GetDiffAsync()
+-    {
+-        if (_projectRoot == null)
+-        {
+-            throw new InvalidOperationException("No .sln file found or not in a git repository.");
+-        }
+-
+-        var processStartInfo = new ProcessStartInfo
+-        {
+-            FileName = "git",
+-            Arguments = "diff",
+-            WorkingDirectory = _projectRoot,
+-            RedirectStandardOutput = true,
+-            RedirectStandardError = true,
+-            UseShellExecute = false,
+-            CreateNoWindow = true
+-        };
+-
+-        using var process = new Process { StartInfo = processStartInfo };
+-        process.Start();
+-
+-        var output = await process.StandardOutput.ReadToEndAsync();
+-        var error = await process.StandardError.ReadToEndAsync();
+-
+-        await process.WaitForExitAsync();
+-
+-        if (process.ExitCode != 0 && !string.IsNullOrEmpty(error))
+-        {
+-            throw new InvalidOperationException($"Git diff failed: {error}");
+-        }
+-
+-        return output;
+-    }
+-
+-    public string GetDiff()
+-    {
+-        if (_projectRoot == null)
+-        {
+-            throw new InvalidOperationException("No .sln file found or not in a git repository.");
+-        }
+-
+-        var processStartInfo = new ProcessStartInfo
+-        {
+-            FileName = "git",
+-            Arguments = "diff",
+-            WorkingDirectory = _projectRoot,
+-            RedirectStandardOutput = true,
+-            RedirectStandardError = true,
+-            UseShellExecute = false,
+-            CreateNoWindow = true
+-        };
+-
+-        using var process = new Process { StartInfo = processStartInfo };
+-        process.Start();
+-
+-        var output = process.StandardOutput.ReadToEnd();
+-        var error = process.StandardError.ReadToEnd();
+-
+-        process.WaitForExit();
+-
+-        if (process.ExitCode != 0 && !string.IsNullOrEmpty(error))
+-        {
+-            throw new InvalidOperationException($"Git diff failed: {error}");
+-        }
+-
+-        return output;
+-    }
+-
+-    private string? GetProjectRoot()
+-    {
+-        var currentDirectory = Directory.GetCurrentDirectory();
+-        var directory = new DirectoryInfo(currentDirectory);
+-        var depth = 0;
+-
+-        // Traverse up to find the directory containing the .sln file
+-        while (directory != null && depth < _maxDirectoryTraversalDepth)
+-        {
+-            if (directory.GetFiles("*.sln").Any())
+-            {
+-                // Check if this directory is also a git repository
+-                if (IsGitRepository(directory.FullName))
+-                {
+-                    return directory.FullName;
+-                }
+-            }
+-            directory = directory.Parent;
+-            depth++;
+-        }
+-
+-        // If no .sln file found or max depth reached, return null
+-        return null;
+-    }
+-
+-    private bool IsGitRepository(string directoryPath)
+-    {
+-        return Directory.Exists(Path.Combine(directoryPath, ".git"));
+-    }
+-}
+diff --git a/src/Gait/Program.cs b/src/Gait/Program.cs
+index 3751555..ace70cf 100644
+--- a/src/Gait/Program.cs
++++ b/src/Gait/Program.cs
+@@ -1,2 +1,41 @@
+-﻿// See https://aka.ms/new-console-template for more information
+-Console.WriteLine("Hello, World!");
++﻿using Gait;
++using Microsoft.Extensions.DependencyInjection;
++using Microsoft.Extensions.Hosting;
++using Microsoft.Extensions.Logging;
++using Microsoft.Extensions.Configuration;
++using Gait.Services;
++using Gait.Configuration;
++
++// Create and configure the host
++var host = Host.CreateDefaultBuilder(args)
++    .ConfigureAppConfiguration((context, config) =>
++    {
++        config.SetBasePath(Directory.GetCurrentDirectory())
++              .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
++              .AddEnvironmentVariables();
++    })
++    .ConfigureServices((context, services) =>
++    {
++        services.Configure<OpenAIConfiguration>( context.Configuration.GetSection(OpenAIConfiguration.SectionName));
++
++        services.AddSingleton<CommandRunner>();
++        services.AddSingleton<GitDiffService>();
++        services.AddSingleton<AiService>();
++
++        services.AddTransient<App>();
++    })
++    .ConfigureLogging(logging =>
++    {
++        logging.ClearProviders();
++        logging.AddSimpleConsole(options =>
++        {
++            options.IncludeScopes = true;
++            options.TimestampFormat = "[yyyy-MM-dd HH:mm:ss] ";
++            options.SingleLine = true;
++        });
++        logging.SetMinimumLevel(LogLevel.Information);
++    })
++    .Build();
++
++var app = host.Services.GetRequiredService<App>();
++await app.RunAsync();
+diff --git a/src/Gait/Services/AIService.cs b/src/Gait/Services/AIService.cs
+new file mode 100644
+index 0000000..4fcf917
+--- /dev/null
++++ b/src/Gait/Services/AIService.cs
+@@ -0,0 +1,78 @@
++using Microsoft.Extensions.Logging;
++using Microsoft.Extensions.Options;
++using Microsoft.SemanticKernel.ChatCompletion;
++using Microsoft.SemanticKernel.Connectors.OpenAI;
++using Gait.Configuration;
++
++namespace Gait.Services;
++
++public class AiService
++{
++    private readonly ILogger<AiService> _logger;
++    private readonly IChatCompletionService _chatService;
++    private readonly string _prompt;
++
++    public AiService(IOptions<OpenAIConfiguration> openAIOptions, ILogger<AiService> logger)
++    {
++        var openAiConfig = openAIOptions.Value;
++        _logger = logger;
++
++        _prompt = LoadPromptFromFile(openAiConfig.PromptPath) ?? "Summarize the below `git diff` output.";
++
++        var apiKey = openAiConfig.ApiKey;
++        if (string.IsNullOrWhiteSpace(apiKey))
++            apiKey = Environment.GetEnvironmentVariable("GAIT_OPENAI")
++                     ?? throw new Exception("OpenAI API key not found in configuration or environment variables");
++
++        _chatService = new OpenAIChatCompletionService(openAiConfig.Model, apiKey);
++        _logger.LogInformation("AI Service initialized with model: {Model}", openAiConfig.Model);
++    }
++
++    public async Task<string> GetDiffSummary(string[] diff)
++    {
++        var history = new ChatHistory();
++
++        history.AddUserMessage(_prompt);
++        history.AddUserMessage("Here is the `git diff` output:");
++        history.AddUserMessage(string.Join("\n", diff));
++
++        var response = string.Empty;
++        foreach (var res in await _chatService.GetChatMessageContentsAsync(history))
++            response += res + "\n";
++
++        return response + "\n ** Generated by Gait **";
++    }
++
++    private string? LoadPromptFromFile(string promptPath)
++    {
++        if (string.IsNullOrWhiteSpace(promptPath))
++        {
++            _logger.LogWarning("No prompt path specified, using default prompt");
++            return null;
++        }
++
++        try
++        {
++            if (!Path.IsPathRooted(promptPath))
++            {
++                // If relative path, make it relative to the application directory
++                promptPath = Path.Combine(AppContext.BaseDirectory, promptPath);
++            }
++
++            if (!File.Exists(promptPath))
++            {
++                _logger.LogWarning("Prompt file not found at {PromptPath}, using default prompt", promptPath);
++                return null;
++            }
++
++            var prompt = File.ReadAllText(promptPath).Trim();
++            _logger.LogInformation("Loaded prompt from file: {PromptPath}", promptPath);
++            return prompt;
++        }
++        catch (Exception ex)
++        {
++            _logger.LogError(ex, "Error loading prompt from file {PromptPath}, using default prompt", promptPath);
++            return null;
++        }
++    }
++}
+diff --git a/src/Gait/Services/CommandRunner.cs b/src/Gait/Services/CommandRunner.cs
+new file mode 100644
+index 0000000..201af6e
+--- /dev/null
++++ b/src/Gait/Services/CommandRunner.cs
+@@ -0,0 +1,44 @@
++using System.Diagnostics;
++
++namespace Gait.Services;
++
++public class CommandRunner
++{
++    public CommandResult Run(string fileName, string arguments, string workingDirectory)
++    {
++        var processStartInfo = new ProcessStartInfo
++        {
++            FileName = fileName,
++            Arguments = arguments,
++            WorkingDirectory = workingDirectory,
++            RedirectStandardOutput = true,
++            RedirectStandardError = true,
++            UseShellExecute = false,
++            CreateNoWindow = true
++        };
++
++        using var process = new Process { StartInfo = processStartInfo };
++        process.Start();
++
++        var output = process.StandardOutput.ReadToEnd();
++        var error = process.StandardError.ReadToEnd();
++
++        process.WaitForExit();
++
++        return new CommandResult
++        {
++            ExitCode = process.ExitCode,
++            Output = output,
++            Error = error
++        };
++    }
++}
++
++public class CommandResult
++{
++    public int ExitCode { get; set; }
++    public string Output { get; set; } = string.Empty;
++    public string Error { get; set; } = string.Empty;
++    
++    public bool IsSuccess => ExitCode == 0;
++}
+diff --git a/src/Gait/Services/GitDiffService.cs b/src/Gait/Services/GitDiffService.cs
+new file mode 100644
+index 0000000..dd0b24a
+--- /dev/null
++++ b/src/Gait/Services/GitDiffService.cs
+@@ -0,0 +1,91 @@
++using Microsoft.Extensions.Logging;
++
++namespace Gait.Services;
++
++public class GitDiffService(ILogger<GitDiffService> logger, AiService aiService, CommandRunner commandRunner, int maxDirectoryTraversalDepth = 10)
++{
++    private string? _projectRoot;
++    public void Init() => _projectRoot = GetProjectRoot() ?? throw new InvalidOperationException("Project root not found");
++
++    public string GetDiff()
++    {
++        var result = commandRunner.Run("git", "diff --staged", _projectRoot);
++        if (!result.IsSuccess && !string.IsNullOrEmpty(result.Error))
++        {
++            logger.LogError("Git diff failed: {Error}", result.Error);
++            throw new InvalidOperationException($"Git diff failed: {result.Error}");
++        }
++
++        logger.LogInformation("Git diff retrieved successfully from {ProjectRoot}", _projectRoot);
++        return result.Output;
++    }
++
++    public async Task<string> GetDiffSummaryAsync()
++    {
++        var diff = GetDiff();
++
++        if (string.IsNullOrWhiteSpace(diff))
++            return "No changes detected in git diff.";
++
++        logger.LogInformation("Requesting AI summary for git diff");
++        var summary = await aiService.GetDiffSummary(diff.Split('\n'));
++        return summary;
++    }
++
++    public void Commit(string commitMessage)
++    {
++        if (_projectRoot == null)
++        {
++            logger.LogWarning("Project root not found - no .sln file or not in a git repository");
++            throw new InvalidOperationException("Project root not found");
++        }
++
++        if (string.IsNullOrWhiteSpace(commitMessage))
++        {
++            throw new ArgumentException("Commit message cannot be null or empty", nameof(commitMessage));
++        }
++
++        var result = commandRunner.Run("git", $"commit -m \"{commitMessage}\"", _projectRoot);
++
++        if (!result.IsSuccess)
++        {
++            logger.LogError("Git commit failed: {Error}", result.Error);
++            throw new InvalidOperationException($"Git commit failed: {result.Error}");
++        }
++
++        logger.LogInformation("Git commit successful: {Output}", result.Output);
++    }
++
++    private string? GetProjectRoot()
++    {
++        var currentDirectory = Directory.GetCurrentDirectory();
++        var directory = new DirectoryInfo(currentDirectory);
++        var depth = 0;
++
++        // Traverse up to find the directory containing the .sln file
++        while (directory != null && depth < maxDirectoryTraversalDepth)
++        {
++            if (directory.GetFiles("*.sln").Any())
++            {
++                if (IsGitRepository(directory.FullName))
++                {
++                    logger.LogInformation("Found project root at: {ProjectRoot}", directory.FullName);
++                    return directory.FullName;
++                }
++                else
++                {
++                    logger.LogError("Found .sln file but directory is not a git repository: {Directory}", directory.FullName);
++                    throw new InvalidOperationException("Not a git repository");
++                }
++            }
++            directory = directory.Parent;
++            depth++;
++        }
++
++        // If no .sln file found or max depth reached, return null
++        logger.LogWarning("No .sln file found within {MaxDepth} directory levels", maxDirectoryTraversalDepth);
++        return null;
++    }
++
++    private bool IsGitRepository(string directoryPath) => Directory.Exists(Path.Combine(directoryPath, ".git"));
++}
+diff --git a/src/Gait/Services/IConfigurationService.cs b/src/Gait/Services/IConfigurationService.cs
+new file mode 100644
+index 0000000..d88b6bc
+--- /dev/null
++++ b/src/Gait/Services/IConfigurationService.cs
+@@ -0,0 +1,7 @@
++namespace Gait.Services;
++
++public interface IConfigurationService
++{
++    string GetOpenAIModel();
++    string GetOpenAIKey();
++}
+diff --git a/src/Gait/appsettings.json b/src/Gait/appsettings.json
+new file mode 100644
+index 0000000..2f77497
+--- /dev/null
++++ b/src/Gait/appsettings.json
+@@ -0,0 +1,16 @@
++{
++  "Logging": {
++    "LogLevel": {
++      "Default": "Information",
++      "Microsoft": "Warning",
++      "Microsoft.Hosting.Lifetime": "Information",
++      "Gait": "Information",
++      "Gait.Services": "Information"
++    }
++  },
++  "OpenAI": {
++    "Model": "gpt-4o-mini",
++    "ApiKey": "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",
++    "PromptPath": "diff-prompt.txt"
++  }
++}
+diff --git a/src/Gait/diff-prompt.txt b/src/Gait/diff-prompt.txt
+new file mode 100644
+index 0000000..5610272
+--- /dev/null
++++ b/src/Gait/diff-prompt.txt
+@@ -0,0 +1,5 @@
++Create a commit message for the following `git diff` output.
++Keep it concise, but do not use complicated language. The points do not have to be proper sentences if they are easily readable and short.
++If the changes are large (more than 15 files or meaningful), do not document all the small things. Only the higher level changes.
++
++Do not prefix or postfix the message with any reference to a commit message. Include just the summary of changes.
