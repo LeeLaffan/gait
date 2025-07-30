@@ -1,14 +1,14 @@
 using Gait.Utils;
 using Microsoft.Extensions.Logging;
+using Gait.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Gait.Services;
 
-public class GitService(ILogger<GitService> logger, CommandRunner commandRunner, ConsoleOutput console)
+public class GitService(ILogger<GitService> logger, CommandRunner commandRunner, ConsoleOutput console, IOptions<GitConfiguration> gitConfig)
 {
-    private const int MaxDirectoryTraversalDepth = 10;
-
+    private readonly int _maxRecursiveDirectories = gitConfig.Value.MaxRecursiveDirectories;
     private string? ProjectRoot => field ??= GetProjectRoot();
-    private readonly bool _staged = true;
 
     public Result<bool, string> Commit(string message)
     {
@@ -59,7 +59,7 @@ public class GitService(ILogger<GitService> logger, CommandRunner commandRunner,
 
         console.WriteProgress("Running `git diff`");
 
-        var command = "diff" + (_staged ? " --staged" : string.Empty);
+        var command = "diff --staged";
         var diffResult = commandRunner.Run("git", command, ProjectRoot);
 
         if (diffResult.IsError(out var diff, out var error))
@@ -74,13 +74,14 @@ public class GitService(ILogger<GitService> logger, CommandRunner commandRunner,
         return diffResult;
     }
 
-    private static string? GetProjectRoot()
+
+    private string? GetProjectRoot()
     {
         var currentDirectory = Directory.GetCurrentDirectory();
         var directory = new DirectoryInfo(currentDirectory);
         var depth = 0;
 
-        while (directory != null && depth < MaxDirectoryTraversalDepth)
+        while (directory != null && depth < _maxRecursiveDirectories)
         {
             depth++;
 

@@ -22,11 +22,12 @@ var host = Host.CreateDefaultBuilder(args)
     .ConfigureServices((context, services) =>
     {
         services.Configure<OpenAIConfiguration>( context.Configuration.GetSection(OpenAIConfiguration.SectionName));
+        services.Configure<GitConfiguration>( context.Configuration.GetSection(GitConfiguration.SectionName));
 
         services.AddSingleton<CommandRunner>();
-        services.AddSingleton<GitService>();
         services.AddSingleton<AiService>();
         services.AddSingleton<ConsoleOutput>();
+        services.AddSingleton<GitService>();
 
         services.AddTransient<App>();
     })

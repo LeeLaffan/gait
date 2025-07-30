@@ -21,10 +21,11 @@ public class CommandRunner
         using var process = new Process();
         process.StartInfo = processStartInfo;
         process.Start();
-        process.WaitForExit();
 
         var output = process.StandardOutput.ReadToEnd();
         var error = process.StandardError.ReadToEnd();
+
+        process.WaitForExit();
 
         return process.ExitCode == 0
             ? Result<string, string>.Ok(output + error)
