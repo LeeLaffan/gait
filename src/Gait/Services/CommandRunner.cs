@@ -31,5 +31,3 @@ public class CommandRunner
             : Result<string, string>.Fail(error);
     }
 }
-
-public record CommandResult(int ExitCode, string? Output, string? Error);

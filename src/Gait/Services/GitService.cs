@@ -15,9 +15,9 @@ public class GitService(ILogger<GitService> logger, CommandRunner commandRunner,
         if (string.IsNullOrWhiteSpace(ProjectRoot))
             return Result<bool, string>.Fail("Cannot git commit: Not in a valid project directory");
 
-        // Split message into lines and build arguments
+        // Split message into lines and escape embedded double quotes
         var lines = message.Split(["\r\n", "\n"], StringSplitOptions.None);
-        var args = string.Join(" ", lines.Select(line => $"-m \"{line}\""));
+        var args = string.Join(" ", lines.Select(line => $"-m \"{line.Replace("\"", "\\\"")}\""));
 
         var result = commandRunner.Run("git", $"commit {args}", ProjectRoot);
         if (result.IsError(out _, out var error))
