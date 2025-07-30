@@ -16,8 +16,8 @@ var host = Host.CreateDefaultBuilder(args)
     })
     .ConfigureLogging(logging =>
     {
-        logging.ClearProviders(); // Remove all default providers including console
-        // logging.AddFile("logs/app.log"); // if you have a file provider
+        // Remove non-default console logging
+        logging.ClearProviders();
     })
     .ConfigureServices((context, services) =>
     {
