@@ -2,27 +2,20 @@ using Gait.Utils;
 
 namespace Gait.Services;
 
-public class GitDiffService(AiService aiService, CommandRunner commandRunner, ConsoleOutput console)
+public class GitService(CommandRunner commandRunner, ConsoleOutput console)
 {
     private const int MaxDirectoryTraversalDepth = 10;
     private readonly string? _projectRoot = GetProjectRoot();
     private readonly bool _staged = true;
 
-    public async Task<Result<string[], string>> GetDiffSummaryAsync()
+    public Result<bool, string> Commit(string message)
     {
-        var diff = GetDiff();
-        if (diff.IsError)
-            return Result<string[], string>.Fail(diff.Error);
+        if (string.IsNullOrWhiteSpace(_projectRoot))
+            return Result<bool, string>.Fail("Cannot retrieve git diff: Not in a valid project directory");
 
-        try
-        {
-            var summary = await aiService.GetDiffSummary(diff.Value.Split('\n'));
-            return summary;
-        }
-        catch (Exception ex)
-        {
-            return Result<string[], string>.Fail($"Failed to generate AI summary: {ex.Message}");
-        }
+        commandRunner.Run("git", "commit -m \"" + message + "\"", _projectRoot);
+
+        return Result<bool, string>.Ok(true);
     }
 
     public Result<string, string> GetDiff()
@@ -30,13 +23,16 @@ public class GitDiffService(AiService aiService, CommandRunner commandRunner, Co
         if (string.IsNullOrWhiteSpace(_projectRoot))
             return Result<string, string>.Fail("Cannot retrieve git diff: Not in a valid project directory");
 
-        console.WriteProgress("Retrieving git diff...");
+        console.WriteProgress("Running `git diff`");
 
         var command = "diff" + (_staged ? " --staged" : string.Empty);
         var diffCommand = commandRunner.Run("git", command, _projectRoot);
 
         if (diffCommand.ExitCode != 0)
             return Result<string, string>.Fail($"Git command failed: {diffCommand.Error ?? "Unknown error"}");
+
+        if (string.IsNullOrWhiteSpace(diffCommand.Output))
+            return Result<string, string>.Fail("No git diff output found");
 
         return Result<string, string>.Ok(diffCommand.Output ?? string.Empty);
     }

@@ -17,7 +17,6 @@ var host = Host.CreateDefaultBuilder(args)
     .ConfigureLogging(logging =>
     {
         logging.ClearProviders(); // Remove all default providers including console
-        // Add only the providers you want, e.g.:
         // logging.AddFile("logs/app.log"); // if you have a file provider
     })
     .ConfigureServices((context, services) =>
@@ -25,7 +24,7 @@ var host = Host.CreateDefaultBuilder(args)
         services.Configure<OpenAIConfiguration>( context.Configuration.GetSection(OpenAIConfiguration.SectionName));
 
         services.AddSingleton<CommandRunner>();
-        services.AddSingleton<GitDiffService>();
+        services.AddSingleton<GitService>();
         services.AddSingleton<AiService>();
         services.AddSingleton<ConsoleOutput>();
 
