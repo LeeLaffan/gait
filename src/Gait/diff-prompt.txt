@@ -9,7 +9,7 @@ Keep it concise, but do not use complicated language. The points do not have to 
 
 # Commit Message Details
 
-For every 10 files changed, there are 3 bullet points allowed, so you will have to decide which to highlight.
+For every 10 files changed, there are 3 bullet points allowed, so you will have to decide which to highlight. If 3 bullet points are not needed, less than that is encouraged.
 If the changes are large (more than 15 files or meaningful), do not document all the small things. Only the higher level changes.
 If a change is minor, such as a variable rename or minor code arrangement or not relevant to the summary, do not mention it at all.
 No need to mention logging changes, or other small changes like a parameter change, or variable rename.
