@@ -11,3 +11,5 @@ When making changes, ensure that you:
 - Private vaiables should be prefixed with an underscore (e.g., `_privateVariable`).
 - Use `var` when the type is obvious from the right-hand side of the assignment.
 In an extreme case, you can add a comment to explain why a specific implementation was chosen.
+
+If a change upda

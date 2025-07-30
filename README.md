@@ -16,19 +16,38 @@ Gait is a .NET application for automating and managing Git operations from the c
 
 Settings are managed via `appsettings.json` and `appsettings.Production.json`.
 
-### OpenAI Settings
+Below is an example of a minimal `appsettings.json`:
 
-The application uses OpenAI to automatically summarise diffs and generate commit messages. The relevant settings in `appsettings.json` are:
+```json
+{
+  "OpenAI": {
+    "Model": "gpt-4o-mini",
+    "ApiKeyVar": "KEY_OPENAI",
+    "PromptPath": "diff-prompt.txt"
+  },
+  "Git": {
+    "MaxRecursiveDirectories": 10
+  }
+}
+```
 
-- `Model`: The OpenAI model used for summarisation (e.g., `gpt-4o-mini`).
-- `ApiKeyVar`: The name of the environment variable that stores your OpenAI API key (e.g., `KEY_OPENAI`).
-- `PromptPath`: The path to the prompt file used for diff summarisation (e.g., `diff-prompt.txt`).
+### Descriptions
+
+| Section | Setting                 | Description                                                              | Example Value     |
+| ------- | ----------------------- | ------------------------------------------------------------------------ | ----------------- |
+| OpenAI  | Model                   | The OpenAI model used for summarisation                                  | `gpt-4o-mini`     |
+| OpenAI  | ApiKeyVar               | The name of the environment variable that stores your OpenAI API key     | `KEY_OPENAI`      |
+| OpenAI  | PromptPath              | The path to the prompt file used for diff summarisation                  | `diff-prompt.txt` |
+| Git     | MaxRecursiveDirectories | The maximum number of parent directories to traverse for a `.git` folder | `10`              |
 
 Make sure to set your OpenAI API key in your environment before running the application:
 
 ```pwsh
 $env:KEY_OPENAI = "your-api-key-here"
 ```
+
+- **Git Settings**
+  - `MaxRecursiveDirectories`: The maximum number of parent directories to traverse when searching for a `.git` folder. Default is `10`.
 
 ## Requirements
 
