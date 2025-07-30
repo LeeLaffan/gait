@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 
 namespace Gait;
 
-public class App(GitService gitService, ConsoleOutput console, AiService aiService, IOptions<OpenAIConfiguration> aiOptions, IOptions<GitConfiguration> gitOptions)
+public class App(GitService gitService, ConsoleOutput console, AiService aiService, IOptions<GitConfiguration> gitOptions)
 {
     public async Task RunAsync() =>
         (await Process()).Match(
