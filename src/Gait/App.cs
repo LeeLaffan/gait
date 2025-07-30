@@ -1,6 +1,5 @@
 ﻿using Gait.Configuration;
 using Gait.Services;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Gait;
@@ -34,6 +33,12 @@ public class App(GitService gitService, ConsoleOutput console, AiService aiServi
         if (!gitService.Commit(summary).IsSuccess(out _, out error))
         {
             console.WriteError($"Error running commit command:\n{error}");
+            Environment.Exit(1);
+        }
+
+        if (!gitService.Push().IsSuccess(out _, out error))
+        {
+            console.WriteError($"Error running push command:\n{error}");
             Environment.Exit(1);
         }
 

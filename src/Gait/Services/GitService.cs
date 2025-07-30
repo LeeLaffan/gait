@@ -10,21 +10,21 @@ public class GitService(ILogger<GitService> logger, CommandRunner commandRunner,
     private string? ProjectRoot => field ??= GetProjectRoot();
     private readonly bool _staged = true;
 
-public Result<bool, string> Commit(string message)
-{
-    if (string.IsNullOrWhiteSpace(ProjectRoot))
-        return Result<bool, string>.Fail("Cannot git commit: Not in a valid project directory");
+    public Result<bool, string> Commit(string message)
+    {
+        if (string.IsNullOrWhiteSpace(ProjectRoot))
+            return Result<bool, string>.Fail("Cannot git commit: Not in a valid project directory");
 
-    // Split message into lines and build arguments
-    var lines = message.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-    var args = string.Join(" ", lines.Select(line => $"-m \"{line}\""));
+        // Split message into lines and build arguments
+        var lines = message.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        var args = string.Join(" ", lines.Select(line => $"-m \"{line}\""));
 
-    var result = commandRunner.Run("git", $"commit {args}", ProjectRoot);
-    if (result.IsError(out _, out var error))
-        return error;
+        var result = commandRunner.Run("git", $"commit {args}", ProjectRoot);
+        if (result.IsError(out _, out var error))
+            return error;
 
-    return true;
-}
+        return true;
+    }
 
     public Result<bool, string> AddAll()
     {
@@ -32,6 +32,18 @@ public Result<bool, string> Commit(string message)
             return Result<bool, string>.Fail("Cannot git add: Not in a valid project directory");
 
         var result = commandRunner.Run("git", "add *", ProjectRoot);
+        if (result.IsError(out var success, out var error))
+            return error;
+
+        return true;
+    }
+
+    public Result<bool, string> Push()
+    {
+        if (string.IsNullOrWhiteSpace(ProjectRoot))
+            return Result<bool, string>.Fail("Cannot git push: Not in a valid project directory");
+
+        var result = commandRunner.Run("git", "push", ProjectRoot);
         if (result.IsError(out var success, out var error))
             return error;
 
