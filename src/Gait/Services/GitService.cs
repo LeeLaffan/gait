@@ -12,9 +12,21 @@ public class GitService(CommandRunner commandRunner, ConsoleOutput console)
     public Result<bool, string> Commit(string message)
     {
         if (string.IsNullOrWhiteSpace(ProjectRoot))
-            return Result<bool, string>.Fail("Cannot retrieve git diff: Not in a valid project directory");
+            return Result<bool, string>.Fail("Cannot git commit: Not in a valid project directory");
 
         var result = commandRunner.Run("git", $"commit -m '{message}'", ProjectRoot);
+        if (!result.IsSuccess(out var _, out var error))
+            return error;
+
+        return true;
+    }
+
+    public Result<bool, string> AddAll()
+    {
+        if (string.IsNullOrWhiteSpace(ProjectRoot))
+            return Result<bool, string>.Fail("Cannot git add: Not in a valid project directory");
+
+        var result = commandRunner.Run("git", $"add *", ProjectRoot);
         if (!result.IsSuccess(out var _, out var error))
             return error;
 
@@ -24,7 +36,7 @@ public class GitService(CommandRunner commandRunner, ConsoleOutput console)
     public Result<string, string> GetDiff()
     {
         if (string.IsNullOrWhiteSpace(ProjectRoot))
-            return Result<string, string>.Fail("Cannot retrieve git diff: Not in a valid project directory");
+            return Result<string, string>.Fail("Cannot git diff: Not in a valid project directory");
 
         console.WriteProgress("Running `git diff`");
 
@@ -33,6 +45,9 @@ public class GitService(CommandRunner commandRunner, ConsoleOutput console)
 
         if (diffCommand.IsError)
             return Result<string, string>.Fail($"Git command failed: \n{diffCommand.Error ?? "Unknown error"}");
+
+        if (string.IsNullOrWhiteSpace(diffCommand.Value))
+            return Result<string, string>.Fail("No git diff found");
 
         return diffCommand;
     }

@@ -9,6 +9,13 @@ public class App(ILogger<App> logger, GitService gitService, ConsoleOutput conso
 {
     public async Task RunAsync()
     {
+        var add = gitService.AddAll();
+        if (add.IsError)
+        {
+            console.WriteError(add.Error);
+            Environment.Exit(1);
+        }
+
         var diff = gitService.GetDiff();
         if (diff.IsError)
         {
@@ -21,7 +28,6 @@ public class App(ILogger<App> logger, GitService gitService, ConsoleOutput conso
 
         console.WriteProgress($"Summarising diff with model: {aiOptions.Value.Model}");
         var summary = await aiService.GetDiffSummary(diff.Value);
-        console.WriteSuccess("AI analysis completed successfully");
 
         if (string.IsNullOrWhiteSpace(summary))
         {
@@ -35,7 +41,6 @@ public class App(ILogger<App> logger, GitService gitService, ConsoleOutput conso
             Environment.Exit(1);
         }
 
-        console.WriteLine();
-        console.WriteSuccess("Gait application completed successfully");
+        console.WriteSuccess("Gait successfully commit changes");
     }
 }
