@@ -21,16 +21,14 @@ public class CommandRunner
         using var process = new Process();
         process.StartInfo = processStartInfo;
         process.Start();
+        process.WaitForExit();
 
         var output = process.StandardOutput.ReadToEnd();
         var error = process.StandardError.ReadToEnd();
 
-        if(!string.IsNullOrWhiteSpace(error))
-            return Result<string, string>.Fail(error);
-
-        process.WaitForExit();
-
-        return Result<string, string>.Ok(output);
+        return process.ExitCode == 0
+            ? Result<string, string>.Ok(output + error)
+            : Result<string, string>.Fail(error);
     }
 }
 
