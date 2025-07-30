@@ -43,7 +43,6 @@ public class GitService(ILogger<GitService> logger, CommandRunner commandRunner,
         if (string.IsNullOrWhiteSpace(ProjectRoot))
             return Result<bool, string>.Fail("Cannot git push: Not in a valid project directory");
 
-        // TODO Test
         var result = commandRunner.Run("git", "push", ProjectRoot);
         if (result.IsError(out var success, out var error))
             return error;
