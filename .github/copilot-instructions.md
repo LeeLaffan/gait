@@ -1,4 +1,4 @@
-This is a C# app that will allow manage a small amount of git operations for a user.
+This is a C# app that will manage a small number of git operations for a user.
 
 Github: https://github.com/LeeLaffan/gait
 
@@ -7,9 +7,7 @@ Do not over-engineer solutions; keep them simple and straightforward. Use approp
 
 When making changes, ensure that you:
 - Do not use string.IsNullOrEmpty(), instead using string.IsNullOrWhiteSpace().
-- Do not add unnecessary comments; the code should be self-explanatory. This includes doc comments. 
+- Do not add unnecessary comments; the code should be self-explanatory. This includes doc comments. In an extreme case, you can add a comment to explain why a specific implementation was chosen.
 - Private vaiables should be prefixed with an underscore (e.g., `_privateVariable`).
 - Use `var` when the type is obvious from the right-hand side of the assignment.
-In an extreme case, you can add a comment to explain why a specific implementation was chosen.
-
-If a change upda
+- Do not have any logs that have the same message as another, as this can cause confusion when debugging.

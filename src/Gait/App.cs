@@ -23,10 +23,10 @@ public class App(GitService gitService, ConsoleOutput console, AiService aiServi
         }
 
         console.WriteProgress($"Summarising diff with model: {aiOptions.Value.Model}");
-        var summary = await aiService.GetDiffSummary(diff);
-        if (string.IsNullOrWhiteSpace(summary))
+        var summaryResult = await aiService.GetDiffSummary(diff);
+        if (summaryResult.IsError(out var summary, out error))
         {
-            console.WriteWarning("No AI summary could be generated");
+            console.WriteWarning($"No AI summary could be generated: {error}");
             Environment.Exit(1);
         }
 
