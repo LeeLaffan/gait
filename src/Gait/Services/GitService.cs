@@ -1,8 +1,9 @@
 using Gait.Utils;
+using Microsoft.Extensions.Logging;
 
 namespace Gait.Services;
 
-public class GitService(CommandRunner commandRunner, ConsoleOutput console)
+public class GitService(ILogger<GitService> logger, CommandRunner commandRunner, ConsoleOutput console)
 {
     private const int MaxDirectoryTraversalDepth = 10;
 
@@ -14,8 +15,12 @@ public class GitService(CommandRunner commandRunner, ConsoleOutput console)
         if (string.IsNullOrWhiteSpace(ProjectRoot))
             return Result<bool, string>.Fail("Cannot git commit: Not in a valid project directory");
 
-        var result = commandRunner.Run("git", $"commit -m '{message}'", ProjectRoot);
-        if (!result.IsSuccess(out var _, out var error))
+        // Split message into lines and build arguments
+        var lines = message.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        var args = string.Join(" ", lines.Select(line => $"-m \"{line}\""));
+
+        var result = commandRunner.Run("git", $"commit {args}", ProjectRoot);
+        if (result.IsError(out _, out var error))
             return error;
 
         return true;
@@ -26,8 +31,20 @@ public class GitService(CommandRunner commandRunner, ConsoleOutput console)
         if (string.IsNullOrWhiteSpace(ProjectRoot))
             return Result<bool, string>.Fail("Cannot git add: Not in a valid project directory");
 
-        var result = commandRunner.Run("git", $"add *", ProjectRoot);
-        if (!result.IsSuccess(out var _, out var error))
+        var result = commandRunner.Run("git", "add *", ProjectRoot);
+        if (result.IsError(out var success, out var error))
+            return error;
+
+        return true;
+    }
+
+    public Result<bool, string> Push()
+    {
+        if (string.IsNullOrWhiteSpace(ProjectRoot))
+            return Result<bool, string>.Fail("Cannot git push: Not in a valid project directory");
+
+        var result = commandRunner.Run("git", "push", ProjectRoot);
+        if (result.IsError(out var success, out var error))
             return error;
 
         return true;
@@ -41,15 +58,18 @@ public class GitService(CommandRunner commandRunner, ConsoleOutput console)
         console.WriteProgress("Running `git diff`");
 
         var command = "diff" + (_staged ? " --staged" : string.Empty);
-        var diffCommand = commandRunner.Run("git", command, ProjectRoot);
+        var diffResult = commandRunner.Run("git", command, ProjectRoot);
 
-        if (diffCommand.IsError)
-            return Result<string, string>.Fail($"Git command failed: \n{diffCommand.Error ?? "Unknown error"}");
+        if (diffResult.IsError(out var diff, out var error))
+            return Result<string, string>.Fail($"Git command failed:\n{error}");
 
-        if (string.IsNullOrWhiteSpace(diffCommand.Value))
+        if (string.IsNullOrWhiteSpace(diff))
             return Result<string, string>.Fail("No git diff found");
 
-        return diffCommand;
+        logger.LogInformation("Git diff retrieved successfully");
+        logger.LogDebug("Git diff output: {GitDiff}", diffResult);
+
+        return diffResult;
     }
 
     private static string? GetProjectRoot()

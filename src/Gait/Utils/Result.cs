@@ -36,27 +36,8 @@ public readonly struct Result<TSuccess, TError>
         return false;
     }
 
-    public bool IsError => !_isSuccess;
-
-    public TSuccess Value
-    {
-        get
-        {
-            if (!_isSuccess)
-                throw new InvalidOperationException("Cannot access Success value when result is an error");
-            return _success!;
-        }
-    }
-
-    public TError Error
-    {
-        get
-        {
-            if (_isSuccess)
-                throw new InvalidOperationException("Cannot access Error value when result is a success");
-            return _error!;
-        }
-    }
+    public bool IsError([NotNullWhen(false)] out TSuccess? success, [NotNullWhen(true)] out TError? error) =>
+        !IsSuccess(out success, out error);
 
     public static Result<TSuccess, TError> Ok(TSuccess success) => new(success);
     public static Result<TSuccess, TError> Fail(TError error) => new(error);
@@ -64,15 +45,4 @@ public readonly struct Result<TSuccess, TError>
     public static implicit operator Result<TSuccess, TError>(TSuccess success) => Ok(success);
 
     public static implicit operator Result<TSuccess, TError>(TError error) => Fail(error);
-
-    public void Match(Action<TSuccess> onSuccess, Action<TError> onError)
-    {
-        if (_isSuccess)
-            onSuccess(_success!);
-        else
-            onError(_error!);
-    }
-
-    public TResult Match<TResult>(Func<TSuccess, TResult> onSuccess, Func<TError, TResult> onError) =>
-        _isSuccess ? onSuccess(_success!) : onError(_error!);
 }

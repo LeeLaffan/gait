@@ -3,6 +3,6 @@ The first line is the commit title, followed by a blank line, then the body of t
 Keep it concise, but do not use complicated language. The points do not have to be proper sentences if they are easily readable and short.
 If the changes are large (more than 15 files or meaningful), do not document all the small things. Only the higher level changes.
 If a change is minor, such as a variable rename or minor code arrangement or not relevant to the summary, do not mention it at all.
-No need to mention logging changes.
+No need to mention logging changes, or other small changes like a parameter change, or variable rename.
 
 Do not prefix or postfix the message with any reference to a commit message. Include just the summary of changes.
