@@ -42,6 +42,6 @@ public class App(GitService gitService, ConsoleOutput console, AiService aiServi
             Environment.Exit(1);
         }
 
-        console.WriteSuccess("Gait successfully commit changes");
+        console.WriteSuccess("Gait successfully commited changes");
     }
 }
