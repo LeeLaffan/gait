@@ -1,4 +1,6 @@
-﻿namespace Gait.Utils;
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace Gait.Utils;
 
 public readonly struct Result<TSuccess, TError>
 {
@@ -20,7 +22,19 @@ public readonly struct Result<TSuccess, TError>
         _isSuccess = false;
     }
 
-    public bool IsSuccess => _isSuccess;
+    public bool IsSuccess([NotNullWhen(true)] out TSuccess? success, [NotNullWhen(false)] out TError? error)
+    {
+        if (_isSuccess)
+        {
+            success = _success!;
+            error = default;
+            return true;
+        }
+
+        success = default;
+        error = _error!;
+        return false;
+    }
 
     public bool IsError => !_isSuccess;
 

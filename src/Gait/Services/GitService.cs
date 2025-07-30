@@ -5,36 +5,36 @@ namespace Gait.Services;
 public class GitService(CommandRunner commandRunner, ConsoleOutput console)
 {
     private const int MaxDirectoryTraversalDepth = 10;
-    private readonly string? _projectRoot = GetProjectRoot();
+
+    private string? ProjectRoot => field ??= GetProjectRoot();
     private readonly bool _staged = true;
 
     public Result<bool, string> Commit(string message)
     {
-        if (string.IsNullOrWhiteSpace(_projectRoot))
+        if (string.IsNullOrWhiteSpace(ProjectRoot))
             return Result<bool, string>.Fail("Cannot retrieve git diff: Not in a valid project directory");
 
-        commandRunner.Run("git", "commit -m \"" + message + "\"", _projectRoot);
+        var result = commandRunner.Run("git", $"commit -m '{message}'", ProjectRoot);
+        if (!result.IsSuccess(out var _, out var error))
+            return error;
 
-        return Result<bool, string>.Ok(true);
+        return true;
     }
 
     public Result<string, string> GetDiff()
     {
-        if (string.IsNullOrWhiteSpace(_projectRoot))
+        if (string.IsNullOrWhiteSpace(ProjectRoot))
             return Result<string, string>.Fail("Cannot retrieve git diff: Not in a valid project directory");
 
         console.WriteProgress("Running `git diff`");
 
         var command = "diff" + (_staged ? " --staged" : string.Empty);
-        var diffCommand = commandRunner.Run("git", command, _projectRoot);
+        var diffCommand = commandRunner.Run("git", command, ProjectRoot);
 
-        if (diffCommand.ExitCode != 0)
-            return Result<string, string>.Fail($"Git command failed: {diffCommand.Error ?? "Unknown error"}");
+        if (diffCommand.IsError)
+            return Result<string, string>.Fail($"Git command failed: \n{diffCommand.Error ?? "Unknown error"}");
 
-        if (string.IsNullOrWhiteSpace(diffCommand.Output))
-            return Result<string, string>.Fail("No git diff output found");
-
-        return Result<string, string>.Ok(diffCommand.Output ?? string.Empty);
+        return diffCommand;
     }
 
     private static string? GetProjectRoot()

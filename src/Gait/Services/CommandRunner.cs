@@ -1,10 +1,11 @@
 using System.Diagnostics;
+using Gait.Utils;
 
 namespace Gait.Services;
 
 public class CommandRunner
 {
-    public CommandResult Run(string fileName, string arguments, string workingDirectory)
+    public Result<string, string> Run(string fileName, string arguments, string workingDirectory)
     {
         var processStartInfo = new ProcessStartInfo
         {
@@ -24,9 +25,12 @@ public class CommandRunner
         var output = process.StandardOutput.ReadToEnd();
         var error = process.StandardError.ReadToEnd();
 
+        if(!string.IsNullOrWhiteSpace(error))
+            return Result<string, string>.Fail(error);
+
         process.WaitForExit();
 
-        return new CommandResult(process.ExitCode, output, error);
+        return Result<string, string>.Ok(output);
     }
 }
 

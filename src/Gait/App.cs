@@ -29,7 +29,11 @@ public class App(ILogger<App> logger, GitService gitService, ConsoleOutput conso
             Environment.Exit(1);
         }
 
-        gitService.Commit(summary);
+        if (!gitService.Commit("hi").IsSuccess(out var _, out var error))
+        {
+            console.WriteError($"Error running commit command:\n{error}");
+            Environment.Exit(1);
+        }
 
         console.WriteLine();
         console.WriteSuccess("Gait application completed successfully");
