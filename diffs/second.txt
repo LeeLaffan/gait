@@ -1,0 +1,430 @@
+diff --git a/src/Gait/App.cs b/src/Gait/App.cs
+index 0bbe6dd..1565690 100644
+--- a/src/Gait/App.cs
++++ b/src/Gait/App.cs
+@@ -3,37 +3,46 @@ using Microsoft.Extensions.Logging;
+ 
+ namespace Gait;
+ 
+-public class App(ILogger<App> logger, GitDiffService gitDiffService)
++public class App(ILogger<App> logger, GitDiffService gitDiffService, ConsoleOutput console)
+ {
+     public async Task RunAsync()
+     {
++        console.WriteInfo("Starting Gait application...");
+         logger.LogInformation("Starting Gait application...");
+ 
+-        try
++        var diff = gitDiffService.GetDiff();
++        if (diff.IsError)
+         {
+-            var diff = gitDiffService.GetDiff();
+-            if (string.IsNullOrWhiteSpace(diff))
+-            {
+-                logger.LogWarning("No git diff available - either no .sln file found, not in a git repository, or no changes detected");
+-                return;
+-            }
+-
+-            logger.LogInformation("Git diff retrieved successfully");
+-            logger.LogDebug("Git diff output: {GitDiff}", diff);
+-
+-            logger.LogInformation("Requesting AI summary for git diff");
+-            var summary = await gitDiffService.GetDiffSummaryAsync();
+-            logger.LogInformation("AI Git Diff Summary:");
+-            logger.LogInformation("");
+-            logger.LogInformation("");
+-            foreach (var line in summary)
+-                logger.LogInformation(line);
++            console.WriteInfo(diff.Error);
++            Environment.Exit(1);
+         }
+-        catch (Exception ex)
++
++        logger.LogInformation("Git diff retrieved successfully");
++        logger.LogDebug("Git diff output: {GitDiff}", diff);
++
++        console.WriteProgress("Analysing git diff with AI...");
++        var summary = await gitDiffService.GetDiffSummaryAsync();
++        console.WriteSuccess("AI analysis completed successfully");
++
++        if (summary.IsError)
++        {
++            console.WriteWarning("No AI summary could be generated");
++            Environment.Exit(1);
++        }
++
++        console.WriteLine();
++        console.WriteSuccess("AI Git Diff Summary:");
++        console.WriteLine();
++
++        logger.LogInformation("AI Git Diff Summary:");
++        foreach (var line in summary.Value)
+         {
+-            logger.LogError(ex, "An error occurred while processing git diff: {ErrorMessage}", ex.Message);
++            console.WriteLine(line);
++            logger.LogInformation(line);
+         }
+ 
++        console.WriteLine();
++        console.WriteSuccess("Gait application completed successfully");
+         logger.LogInformation("Gait application completed.");
+     }
+ }
+diff --git a/src/Gait/Configuration/OpenAIConfiguration.cs b/src/Gait/Configuration/OpenAIConfiguration.cs
+index be4feb4..c983c0f 100644
+--- a/src/Gait/Configuration/OpenAIConfiguration.cs
++++ b/src/Gait/Configuration/OpenAIConfiguration.cs
+@@ -5,6 +5,6 @@ public class OpenAIConfiguration
+     public const string SectionName = "OpenAI";
+     
+     public string Model { get; set; } = "gpt-4o-mini";
+-    public string ApiKey { get; set; } = string.Empty;
++    public string ApiKeyVar { get; set; } = string.Empty;
+     public string PromptPath { get; set; } = string.Empty;
+ }
+diff --git a/src/Gait/Program.cs b/src/Gait/Program.cs
+index 014eef8..18a5f96 100644
+--- a/src/Gait/Program.cs
++++ b/src/Gait/Program.cs
+@@ -11,8 +11,15 @@ var host = Host.CreateDefaultBuilder(args)
+     {
+         config.SetBasePath(Directory.GetCurrentDirectory())
+               .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
++              .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? string.Empty}.json", optional: true)
+               .AddEnvironmentVariables();
+     })
++    .ConfigureLogging(logging =>
++    {
++        logging.ClearProviders(); // Remove all default providers including console
++        // Add only the providers you want, e.g.:
++        // logging.AddFile("logs/app.log"); // if you have a file provider
++    })
+     .ConfigureServices((context, services) =>
+     {
+         services.Configure<OpenAIConfiguration>( context.Configuration.GetSection(OpenAIConfiguration.SectionName));
+@@ -20,20 +27,10 @@ var host = Host.CreateDefaultBuilder(args)
+         services.AddSingleton<CommandRunner>();
+         services.AddSingleton<GitDiffService>();
+         services.AddSingleton<AiService>();
++        services.AddSingleton<ConsoleOutput>();
+ 
+         services.AddTransient<App>();
+     })
+-    .ConfigureLogging(logging =>
+-    {
+-        logging.ClearProviders();
+-        logging.AddSimpleConsole(options =>
+-        {
+-            options.IncludeScopes = true;
+-            options.TimestampFormat = "[yyyy-MM-dd HH:mm:ss] ";
+-            options.SingleLine = true;
+-        });
+-        logging.SetMinimumLevel(LogLevel.Information);
+-    })
+     .Build();
+ 
+ try
+diff --git a/src/Gait/Services/AIService.cs b/src/Gait/Services/AIService.cs
+index ac9650a..33ef11b 100644
+--- a/src/Gait/Services/AIService.cs
++++ b/src/Gait/Services/AIService.cs
+@@ -19,10 +19,10 @@ public class AiService
+ 
+         _initialPrompt = LoadPromptFromFile(openAiConfig.PromptPath) ?? "Summarize the below `git diff` output.";
+ 
+-        if (string.IsNullOrWhiteSpace(openAiConfig.ApiKey))
+-            throw new Exception($"OpenAI API key: {openAiConfig.ApiKey} not found in configuration variables");
++        if (string.IsNullOrWhiteSpace(openAiConfig.ApiKeyVar))
++            throw new Exception($"OpenAI API key: {openAiConfig.ApiKeyVar} not found in configuration variables");
+ 
+-        var apiKey = Environment.GetEnvironmentVariable(openAiConfig.ApiKey) ?? throw new Exception("OpenAI API key not found in environment variables");
++        var apiKey = Environment.GetEnvironmentVariable(openAiConfig.ApiKeyVar) ?? throw new Exception("OpenAI API key not found in environment variables");
+ 
+         _chatService = new OpenAIChatCompletionService(openAiConfig.Model, apiKey);
+         _logger.LogInformation("AI Service initialized with model: {Model}", openAiConfig.Model);
+diff --git a/src/Gait/Services/ConsoleOutput.cs b/src/Gait/Services/ConsoleOutput.cs
+new file mode 100644
+index 0000000..b694c3d
+--- /dev/null
++++ b/src/Gait/Services/ConsoleOutput.cs
+@@ -0,0 +1,63 @@
++using Microsoft.Extensions.Logging;
++
++namespace Gait.Services;
++
++public class ConsoleOutput
++{
++    private readonly ILogger<ConsoleOutput> _logger;
++
++    public ConsoleOutput(ILogger<ConsoleOutput> logger) => _logger = logger;
++    public void WriteInfo(string message)
++    {
++        _logger.LogInformation("Console Info: {Message}", message);
++        Console.WriteLine($"ℹ️  {message}");
++    }
++
++    public void WriteSuccess(string message)
++    {
++        _logger.LogInformation("Console Success: {Message}", message);
++        var originalColor = Console.ForegroundColor;
++        Console.ForegroundColor = ConsoleColor.Green;
++        Console.WriteLine($"✅ {message}");
++        Console.ForegroundColor = originalColor;
++    }
++
++    public void WriteWarning(string message)
++    {
++        _logger.LogWarning("Console Warning: {Message}", message);
++        var originalColor = Console.ForegroundColor;
++        Console.ForegroundColor = ConsoleColor.Yellow;
++        Console.WriteLine($"⚠️  {message}");
++        Console.ForegroundColor = originalColor;
++    }
++
++    public void WriteError(string message)
++    {
++        _logger.LogError("Console Error: {Message}", message);
++        var originalColor = Console.ForegroundColor;
++        Console.ForegroundColor = ConsoleColor.Red;
++        Console.WriteLine($"❌ {message}");
++        Console.ForegroundColor = originalColor;
++    }
++
++    public void WriteLine(string message = "")
++    {
++        _logger.LogDebug("Console WriteLine: {Message}", string.IsNullOrEmpty(message) ? "[empty line]" : message);
++        Console.WriteLine(message);
++    }
++
++    public void Write(string message)
++    {
++        Console.Write(message);
++        _logger.LogDebug("Console Write: {Message}", message);
++    }
++
++    public void WriteProgress(string message)
++    {
++        var originalColor = Console.ForegroundColor;
++        Console.ForegroundColor = ConsoleColor.Cyan;
++        Console.WriteLine($"🔄 {message}");
++        Console.ForegroundColor = originalColor;
++        _logger.LogInformation("Console Progress: {Message}", message);
++    }
++}
+diff --git a/src/Gait/Services/GitDiffService.cs b/src/Gait/Services/GitDiffService.cs
+index 06a16b5..f6fde5e 100644
+--- a/src/Gait/Services/GitDiffService.cs
++++ b/src/Gait/Services/GitDiffService.cs
+@@ -1,35 +1,44 @@
+-using Microsoft.Extensions.Logging;
++using Gait.Utils;
+ 
+ namespace Gait.Services;
+ 
+-public class GitDiffService(ILogger<GitDiffService> logger, AiService aiService, CommandRunner commandRunner)
++public class GitDiffService(AiService aiService, CommandRunner commandRunner, ConsoleOutput console)
+ {
+     private const int MaxDirectoryTraversalDepth = 10;
+-    private readonly string _projectRoot = GetProjectRoot() ?? throw new InvalidOperationException("Project root not found");
++    private readonly string? _projectRoot = GetProjectRoot();
++    private readonly bool _staged = true;
+ 
+-    public async Task<string[]?> GetDiffSummaryAsync()
++    public async Task<Result<string[], string>> GetDiffSummaryAsync()
+     {
+         var diff = GetDiff();
++        if (diff.IsError)
++            return Result<string[], string>.Fail(diff.Error);
+ 
+-        if (string.IsNullOrWhiteSpace(diff))
+-            return null;
+-
+-        logger.LogInformation("Requesting AI summary for git diff");
+-        var summary = await aiService.GetDiffSummary(diff.Split('\n'));
+-        return summary;
++        try
++        {
++            var summary = await aiService.GetDiffSummary(diff.Value.Split('\n'));
++            return summary;
++        }
++        catch (Exception ex)
++        {
++            return Result<string[], string>.Fail($"Failed to generate AI summary: {ex.Message}");
++        }
+     }
+ 
+-    public string GetDiff()
++    public Result<string, string> GetDiff()
+     {
+-        var result = commandRunner.Run("git", "diff", _projectRoot);
+-        if (result.ExitCode != 0 && !string.IsNullOrWhiteSpace(result.Error))
+-        {
+-            logger.LogError("Git diff failed: {Error}", result.Error);
+-            throw new InvalidOperationException($"Git diff failed: {result.Error}");
+-        }
++        if (string.IsNullOrWhiteSpace(_projectRoot))
++            return Result<string, string>.Fail("Cannot retrieve git diff: Not in a valid project directory");
+ 
+-        logger.LogInformation("Git diff retrieved successfully from {ProjectRoot}", _projectRoot);
+-        return result.Output;
++        console.WriteProgress("Retrieving git diff...");
++
++        var command = "diff" + (_staged ? " --staged" : string.Empty);
++        var diffCommand = commandRunner.Run("git", command, _projectRoot);
++
++        if (diffCommand.ExitCode != 0)
++            return Result<string, string>.Fail($"Git command failed: {diffCommand.Error ?? "Unknown error"}");
++
++        return Result<string, string>.Ok(diffCommand.Output ?? string.Empty);
+     }
+ 
+     private static string? GetProjectRoot()
+@@ -40,17 +49,12 @@ public class GitDiffService(ILogger<GitDiffService> logger, AiService aiService,
+ 
+         while (directory != null && depth < MaxDirectoryTraversalDepth)
+         {
+-            if (directory.GetFiles("*.sln").Any())
+-            {
+-                if (IsGitRepository(directory.FullName))
+-                {
+-                    return directory.FullName;
+-                }
+-                throw new InvalidOperationException("Not a git repository");
+-            }
++            depth++;
++
++            if (IsGitRepository(directory.FullName))
++                return directory.FullName; // Found
+ 
+             directory = directory.Parent;
+-            depth++;
+         }
+ 
+         return null;
+diff --git a/src/Gait/Utils/Result.cs b/src/Gait/Utils/Result.cs
+new file mode 100644
+index 0000000..ade16cb
+--- /dev/null
++++ b/src/Gait/Utils/Result.cs
+@@ -0,0 +1,64 @@
++﻿namespace Gait.Utils;
++
++public readonly struct Result<TSuccess, TError>
++{
++    private readonly TSuccess? _success;
++    private readonly TError? _error;
++    private readonly bool _isSuccess;
++
++    private Result(TSuccess success)
++    {
++        _success = success;
++        _error = default;
++        _isSuccess = true;
++    }
++
++    private Result(TError error)
++    {
++        _success = default;
++        _error = error;
++        _isSuccess = false;
++    }
++
++    public bool IsSuccess => _isSuccess;
++
++    public bool IsError => !_isSuccess;
++
++    public TSuccess Value
++    {
++        get
++        {
++            if (!_isSuccess)
++                throw new InvalidOperationException("Cannot access Success value when result is an error");
++            return _success!;
++        }
++    }
++
++    public TError Error
++    {
++        get
++        {
++            if (_isSuccess)
++                throw new InvalidOperationException("Cannot access Error value when result is a success");
++            return _error!;
++        }
++    }
++
++    public static Result<TSuccess, TError> Ok(TSuccess success) => new(success);
++    public static Result<TSuccess, TError> Fail(TError error) => new(error);
++
++    public static implicit operator Result<TSuccess, TError>(TSuccess success) => Ok(success);
++
++    public static implicit operator Result<TSuccess, TError>(TError error) => Fail(error);
++
++    public void Match(Action<TSuccess> onSuccess, Action<TError> onError)
++    {
++        if (_isSuccess)
++            onSuccess(_success!);
++        else
++            onError(_error!);
++    }
++
++    public TResult Match<TResult>(Func<TSuccess, TResult> onSuccess, Func<TError, TResult> onError) =>
++        _isSuccess ? onSuccess(_success!) : onError(_error!);
++}
+diff --git a/src/Gait/appsettings.Production.json b/src/Gait/appsettings.Production.json
+new file mode 100644
+index 0000000..7f1c045
+--- /dev/null
++++ b/src/Gait/appsettings.Production.json
+@@ -0,0 +1,14 @@
++{
++  "Logging": {
++    "LogLevel": {
++      "Default": "Warning",
++      "Microsoft": "Warning",
++      "Microsoft.Hosting.Lifetime": "Warning",
++      "Gait": "Warning",
++      "Gait.Services": "Warning"
++    },
++    "Console": {
++      "Enabled": false
++    }
++  }
++}
+diff --git a/src/Gait/appsettings.json b/src/Gait/appsettings.json
+index 4cd1e7a..608f4ad 100644
+--- a/src/Gait/appsettings.json
++++ b/src/Gait/appsettings.json
+@@ -6,11 +6,16 @@
+       "Microsoft.Hosting.Lifetime": "Information",
+       "Gait": "Information",
+       "Gait.Services": "Information"
+-    }
++    },
++//    "Console": {
++//      "IncludeScopes": true,
++//      "TimestampFormat": "[yyyy-MM-dd HH:mm:ss] ",
++//      "SingleLine": true
++//    }
+   },
+   "OpenAI": {
+     "Model": "gpt-4o-mini",
+-    "ApiKey": "KEY_OPENAI",
++    "ApiKeyVar": "KEY_OPENAI", // Name of env var
+     "PromptPath": "diff-prompt.txt"
+   }
+ }
+diff --git a/src/Gait/diff-prompt.txt b/src/Gait/diff-prompt.txt
+index b87523f..c1b0689 100644
+--- a/src/Gait/diff-prompt.txt
++++ b/src/Gait/diff-prompt.txt
+@@ -1,7 +1,8 @@
+ Create a commit message for the following `git diff` output.
+-The first line is the commit title, followed by a blank line, then the body of the message.
++The first line is the commit title, followed by a blank line, then the body of the message, which will be - bullet points. No extra text other than that.
+ Keep it concise, but do not use complicated language. The points do not have to be proper sentences if they are easily readable and short.
+ If the changes are large (more than 15 files or meaningful), do not document all the small things. Only the higher level changes.
+ If a change is minor, such as a variable rename or minor code arrangement or not relevant to the summary, do not mention it at all.
++No need to mention logging changes.
+ 
+ Do not prefix or postfix the message with any reference to a commit message. Include just the summary of changes.

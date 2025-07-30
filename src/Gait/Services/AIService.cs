@@ -19,10 +19,10 @@ public class AiService
 
         _initialPrompt = LoadPromptFromFile(openAiConfig.PromptPath) ?? "Summarize the below `git diff` output.";
 
-        if (string.IsNullOrWhiteSpace(openAiConfig.ApiKey))
-            throw new Exception($"OpenAI API key: {openAiConfig.ApiKey} not found in configuration variables");
+        if (string.IsNullOrWhiteSpace(openAiConfig.ApiKeyVar))
+            throw new Exception($"OpenAI API key: {openAiConfig.ApiKeyVar} not found in configuration variables");
 
-        var apiKey = Environment.GetEnvironmentVariable(openAiConfig.ApiKey) ?? throw new Exception("OpenAI API key not found in environment variables");
+        var apiKey = Environment.GetEnvironmentVariable(openAiConfig.ApiKeyVar) ?? throw new Exception("OpenAI API key not found in environment variables");
 
         _chatService = new OpenAIChatCompletionService(openAiConfig.Model, apiKey);
         _logger.LogInformation("AI Service initialized with model: {Model}", openAiConfig.Model);

@@ -1,35 +1,44 @@
-using Microsoft.Extensions.Logging;
+using Gait.Utils;
 
 namespace Gait.Services;
 
-public class GitDiffService(ILogger<GitDiffService> logger, AiService aiService, CommandRunner commandRunner)
+public class GitDiffService(AiService aiService, CommandRunner commandRunner, ConsoleOutput console)
 {
     private const int MaxDirectoryTraversalDepth = 10;
-    private readonly string _projectRoot = GetProjectRoot() ?? throw new InvalidOperationException("Project root not found");
+    private readonly string? _projectRoot = GetProjectRoot();
+    private readonly bool _staged = true;
 
-    public async Task<string[]?> GetDiffSummaryAsync()
+    public async Task<Result<string[], string>> GetDiffSummaryAsync()
     {
         var diff = GetDiff();
+        if (diff.IsError)
+            return Result<string[], string>.Fail(diff.Error);
 
-        if (string.IsNullOrWhiteSpace(diff))
-            return null;
-
-        logger.LogInformation("Requesting AI summary for git diff");
-        var summary = await aiService.GetDiffSummary(diff.Split('\n'));
-        return summary;
+        try
+        {
+            var summary = await aiService.GetDiffSummary(diff.Value.Split('\n'));
+            return summary;
+        }
+        catch (Exception ex)
+        {
+            return Result<string[], string>.Fail($"Failed to generate AI summary: {ex.Message}");
+        }
     }
 
-    public string GetDiff()
+    public Result<string, string> GetDiff()
     {
-        var result = commandRunner.Run("git", "diff", _projectRoot);
-        if (result.ExitCode != 0 && !string.IsNullOrWhiteSpace(result.Error))
-        {
-            logger.LogError("Git diff failed: {Error}", result.Error);
-            throw new InvalidOperationException($"Git diff failed: {result.Error}");
-        }
+        if (string.IsNullOrWhiteSpace(_projectRoot))
+            return Result<string, string>.Fail("Cannot retrieve git diff: Not in a valid project directory");
 
-        logger.LogInformation("Git diff retrieved successfully from {ProjectRoot}", _projectRoot);
-        return result.Output;
+        console.WriteProgress("Retrieving git diff...");
+
+        var command = "diff" + (_staged ? " --staged" : string.Empty);
+        var diffCommand = commandRunner.Run("git", command, _projectRoot);
+
+        if (diffCommand.ExitCode != 0)
+            return Result<string, string>.Fail($"Git command failed: {diffCommand.Error ?? "Unknown error"}");
+
+        return Result<string, string>.Ok(diffCommand.Output ?? string.Empty);
     }
 
     private static string? GetProjectRoot()
@@ -40,17 +49,12 @@ public class GitDiffService(ILogger<GitDiffService> logger, AiService aiService,
 
         while (directory != null && depth < MaxDirectoryTraversalDepth)
         {
-            if (directory.GetFiles("*.sln").Any())
-            {
-                if (IsGitRepository(directory.FullName))
-                {
-                    return directory.FullName;
-                }
-                throw new InvalidOperationException("Not a git repository");
-            }
+            depth++;
+
+            if (IsGitRepository(directory.FullName))
+                return directory.FullName; // Found
 
             directory = directory.Parent;
-            depth++;
         }
 
         return null;

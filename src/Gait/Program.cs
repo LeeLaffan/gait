@@ -11,7 +11,14 @@ var host = Host.CreateDefaultBuilder(args)
     {
         config.SetBasePath(Directory.GetCurrentDirectory())
               .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+              .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? string.Empty}.json", optional: true)
               .AddEnvironmentVariables();
+    })
+    .ConfigureLogging(logging =>
+    {
+        logging.ClearProviders(); // Remove all default providers including console
+        // Add only the providers you want, e.g.:
+        // logging.AddFile("logs/app.log"); // if you have a file provider
     })
     .ConfigureServices((context, services) =>
     {
@@ -20,19 +27,9 @@ var host = Host.CreateDefaultBuilder(args)
         services.AddSingleton<CommandRunner>();
         services.AddSingleton<GitDiffService>();
         services.AddSingleton<AiService>();
+        services.AddSingleton<ConsoleOutput>();
 
         services.AddTransient<App>();
-    })
-    .ConfigureLogging(logging =>
-    {
-        logging.ClearProviders();
-        logging.AddSimpleConsole(options =>
-        {
-            options.IncludeScopes = true;
-            options.TimestampFormat = "[yyyy-MM-dd HH:mm:ss] ";
-            options.SingleLine = true;
-        });
-        logging.SetMinimumLevel(LogLevel.Information);
     })
     .Build();
 
