@@ -6,6 +6,7 @@ namespace Gait;
 
 public class App(GitService gitService, ConsoleOutput console, AiService aiService, IOptions<OpenAIConfiguration> aiOptions)
 {
+    // Test add comment
     public async Task RunAsync()
     {
         var add = gitService.AddAll();
