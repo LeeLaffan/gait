@@ -39,6 +39,14 @@ public readonly struct Result<TSuccess, TError>
     public bool IsError([NotNullWhen(false)] out TSuccess? success, [NotNullWhen(true)] out TError? error) =>
         !IsSuccess(out success, out error);
 
+    public void Match(Action<TSuccess> onSuccess, Action<TError> onError)
+    {
+        if (_isSuccess)
+            onSuccess(_success!);
+        else
+            onError(_error!);
+    }
+
     public static Result<TSuccess, TError> Ok(TSuccess success) => new(success);
     public static Result<TSuccess, TError> Fail(TError error) => new(error);
 

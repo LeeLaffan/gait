@@ -14,6 +14,12 @@ Gait is a .NET application for automating and managing Git operations from the c
 
 ## Configuration
 
+Make sure to set your OpenAI API key in your environment before running the application:
+
+```pwsh
+$env:KEY_OPENAI = "your-api-key-here"
+```
+
 Settings are managed via `appsettings.json` and `appsettings.Production.json`.
 
 Below is an example of a minimal `appsettings.json`:
@@ -39,15 +45,6 @@ Below is an example of a minimal `appsettings.json`:
 | OpenAI  | ApiKeyVar               | The name of the environment variable that stores your OpenAI API key     | `KEY_OPENAI`      |
 | OpenAI  | PromptPath              | The path to the prompt file used for diff summarisation                  | `diff-prompt.txt` |
 | Git     | MaxRecursiveDirectories | The maximum number of parent directories to traverse for a `.git` folder | `10`              |
-
-Make sure to set your OpenAI API key in your environment before running the application:
-
-```pwsh
-$env:KEY_OPENAI = "your-api-key-here"
-```
-
-- **Git Settings**
-  - `MaxRecursiveDirectories`: The maximum number of parent directories to traverse when searching for a `.git` folder. Default is `10`.
 
 ## Requirements
 
