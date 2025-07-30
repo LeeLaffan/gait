@@ -19,7 +19,7 @@ public class GitService(ILogger<GitService> logger, CommandRunner commandRunner,
         var lines = message.Split(["\r\n", "\n"], StringSplitOptions.None);
         var args = string.Join(" ", lines.Select(line => $"-m \"{line}\""));
 
-        args = """ -m "hi" -m "bye" """;
+        args = """ -m "hi" -m "" -m "- bye" -m "- bye2" """;
 
         var result = commandRunner.Run("git", $"commit {args}", ProjectRoot);
         if (result.IsError(out _, out var error))
