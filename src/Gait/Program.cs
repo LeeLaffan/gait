@@ -9,11 +9,10 @@ using Gait.Configuration;
 var host = Host.CreateDefaultBuilder(args)
     .ConfigureAppConfiguration((_, config) =>
     {
-        var configFile = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
-        Console.WriteLine($"Config file: {configFile}");
+        var appSettingsFile = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
 
         config.SetBasePath(Directory.GetCurrentDirectory())
-              .AddJsonFile(configFile, optional: false, reloadOnChange: true)
+              .AddJsonFile(appSettingsFile, optional: false, reloadOnChange: true)
               .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? string.Empty}.json", optional: true)
               .AddEnvironmentVariables();
     })
