@@ -36,7 +36,7 @@ public class AiService
     {
         var history = new ChatHistory();
 
-        history.AddUserMessage(_initialPrompt);
+        history.AddSystemMessage(_initialPrompt);
         history.AddUserMessage("Here is the `git diff` output:");
         history.AddUserMessage(diff);
 

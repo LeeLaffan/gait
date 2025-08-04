@@ -9,10 +9,8 @@ using Gait.Configuration;
 var host = Host.CreateDefaultBuilder(args)
     .ConfigureAppConfiguration((_, config) =>
     {
-        config.SetBasePath(Directory.GetCurrentDirectory())
-              .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-              .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? string.Empty}.json", optional: true)
-              .AddEnvironmentVariables();
+        var appSettingsFile = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+        config.AddJsonFile(appSettingsFile, optional: false, reloadOnChange: true).AddEnvironmentVariables();
     })
     .ConfigureLogging(logging =>
     {
@@ -21,8 +19,8 @@ var host = Host.CreateDefaultBuilder(args)
     })
     .ConfigureServices((context, services) =>
     {
-        services.Configure<OpenAIConfiguration>( context.Configuration.GetSection(OpenAIConfiguration.SectionName));
-        services.Configure<GitConfiguration>( context.Configuration.GetSection(GitConfiguration.SectionName));
+        services.Configure<OpenAIConfiguration>(context.Configuration.GetSection(OpenAIConfiguration.SectionName));
+        services.Configure<GitConfiguration>(context.Configuration.GetSection(GitConfiguration.SectionName));
 
         services.AddSingleton<CommandRunner>();
         services.AddSingleton<AiService>();
