@@ -1,10 +1,11 @@
 # Gait
 
-Gait is a .NET application for automating and managing Git operations from the command line, with enhanced output and error handling. It is designed to simplify common Git workflows and provide clear feedback for each operation.
+Gait is a .NET application for automating and managing Git operations from the command line, with enhanced output and error handling. It is
+designed to simplify common Git workflows and provide clear feedback for each operation.
 
 # TODO
- 
 
+- [ ] Allow optional user message on top of AI message
 
 ## Workflow Steps
 
@@ -13,7 +14,6 @@ Gait is a .NET application for automating and managing Git operations from the c
 3. **AI Summary**: The application uses AI to automatically summarise the diff and generate a commit message.
 4. **Commit**: Commits the staged changes using the AI-generated message.
 5. **Push**: Pushes commits to the remote repository (`git push`).
-
 
 ## Configuration
 
@@ -43,7 +43,7 @@ Below is an example of a minimal `appsettings.json`:
 ### Descriptions
 
 | Section | Setting                 | Description                                                              | Example Value     |
-| ------- | ----------------------- | ------------------------------------------------------------------------ | ----------------- |
+|---------|-------------------------|--------------------------------------------------------------------------|-------------------|
 | OpenAI  | Model                   | The OpenAI model used for summarisation                                  | `gpt-4o-mini`     |
 | OpenAI  | ApiKeyVar               | The name of the environment variable that stores your OpenAI API key     | `KEY_OPENAI`      |
 | OpenAI  | PromptPath              | The path to the prompt file used for diff summarisation                  | `diff-prompt.txt` |
