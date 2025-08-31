@@ -6,6 +6,7 @@ designed to simplify common Git workflows and provide clear feedback for each op
 # TODO
 
 - [ ] Allow optional user message on top of AI message
+- [ ] Correctly handle cases where user hasn't done `git pull` yet
 
 ## Workflow Steps
 
